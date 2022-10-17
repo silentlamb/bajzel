@@ -1,0 +1,8 @@
+DEFINE bmp_header
+    `42 4d`     AS magic    # "BM" magic field
+    le_u16      AS size     # The size of BMP file in bytes
+    bytes[2]                # Reserved; actual value depends on the application 
+                            # that creates the image, if created manually can be 0
+    bytes[2]                # Reserved; actual value depends on the application 
+                            # that creates the image, if created manually can be 0
+    le_u16      AS offset   # starting address of the byte where the pixel array can be found
