@@ -1,8 +1,32 @@
 DEFINE bmp_header
     `42 4d`     AS magic    # "BM" magic field
     le_u16      AS size     # The size of BMP file in bytes
-    bytes[2]                # Reserved; actual value depends on the application 
-                            # that creates the image, if created manually can be 0
-    bytes[2]                # Reserved; actual value depends on the application 
-                            # that creates the image, if created manually can be 0
+    bytes[4]                # Reserved (0)
     le_u16      AS offset   # starting address of the byte where the pixel array can be found
+WHERE
+    offset -> VALUE(14 + 40)
+
+DEFINE info_header
+    le_u32 AS header_size   # Size of this header in bytes (40)
+    le_u32 AS width         # bitmap width
+    le_u32 AS height        # bitmap height
+    le_u16 AS planes        # number of planes (1)
+    le_u16 AS bit_count     # Bits per pixel (1, 4, 8, 16, 24)
+    le_u32 AS compression   # type of compression (->0<-, 1, 2)
+    le_u32 AS img_size      # compressed size of image (0)
+    le_u32 AS x_res         # horizontal resolution px/meter
+    le_u32 AS y_res         # vertical resolution px/meter
+    le_u32 AS colors_used   # number of used color 
+    le_u32 AS colors_imp    # numbers of important colors_imp
+WHERE
+    header_size -> VALUE(40)
+    bit_count   -> VALUE(24)
+    compression -> VALUE(0)
+    img_size    -> VALUE(0)
+
+DEFINE bmp_file
+    ref   AS bh FROM bmp_header
+    ref   AS ih FROM info_header
+    bytes AS pixel_data
+WHERE
+    bytes -> LEN($ih:width * $ih:height * $ih:bit_count)

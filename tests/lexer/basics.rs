@@ -106,7 +106,7 @@ fn const_integers_overflowing() {
         }
     };
     // Count invalids so we don't need to add them into expected vector
-    assert_eq!(invalids, 41);
+    assert_eq!(invalids, 40);
 
     // Filter out Invalids as we already figured it out
     let output = output.map(|tokens| {
@@ -121,6 +121,7 @@ fn const_integers_overflowing() {
 
     // When there's too many integer numbers, only the last part (of size i64) is parsed
     let expected = vec![
+        Token::Subtract,
         Token::IntegerLiteral(1687303715884105728),
         Token::IntegerLiteral(1687303715884105727),
         Token::Eof,
@@ -132,8 +133,7 @@ fn const_integers_overflowing() {
 fn const_integers_double_minus() {
     let input = "--1";
     let output = Lexer::lex_tokens(input);
-    let expected =
-        vec![Token::Illegal("-"), Token::IntegerLiteral(-1), Token::Eof];
+    let expected = vec![Token::Subtract, Token::IntegerLiteral(-1), Token::Eof];
     assert_eq!(output, Ok(expected));
 }
 

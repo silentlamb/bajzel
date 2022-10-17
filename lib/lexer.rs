@@ -56,13 +56,13 @@ impl Lexer {
     ///
     fn lex_token(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
         alt((
-            Lexer::lex_operator,
-            Lexer::lex_punctuations,
             Lexer::lex_string,
             Lexer::lex_bytes,
             Lexer::lex_ident_array,
             Lexer::lex_ident,
             Lexer::lex_integer,
+            Lexer::lex_operator,
+            Lexer::lex_punctuations,
             Lexer::lex_illegal,
         ))(input)
     }
@@ -73,7 +73,10 @@ impl Lexer {
         // For a now it's only assignment operator, but let's keep it this way
         alt((
             map(tag("="), |_| Token::Assign),
+            map(tag("+"), |_| Token::Add),
             map(tag("->"), |_| Token::RightArrow),
+            map(tag("-"), |_| Token::Subtract),
+            map(tag("*"), |_| Token::Multiply),
         ))(input)
     }
 
@@ -84,6 +87,8 @@ impl Lexer {
             map(tag("("), |_| Token::LeftParen),
             map(tag(")"), |_| Token::RightParen),
             map(tag(","), |_| Token::Comma),
+            map(tag("$"), |_| Token::Reference),
+            map(tag(":"), |_| Token::Colon),
         ))(input)
     }
 
@@ -143,6 +148,7 @@ impl Lexer {
                     // Keywords
                     "as" => Token::As,
                     "define" => Token::Define,
+                    "from" => Token::From,
                     "generate" => Token::Generate,
                     "where" => Token::Where,
                     "with" => Token::With,
@@ -172,21 +178,27 @@ impl Lexer {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token<'a> {
+    Add,
     As,
     Assign,
     Bytes(Vec<u8>),
+    Colon,
     Comma,
     Comment,
     Define,
     Eof,
+    From,
     Generate,
     Illegal(&'a str),
     IntegerLiteral(i64),
     LeftParen,
+    Multiply,
+    Reference,
     ReservedIdent(&'a str),
     RightArrow,
     RightParen,
     StringLiteral(&'a str),
+    Subtract,
     Type(&'a str),
     TypeArray(&'a str, u32),
     UserIdent(&'a str),
