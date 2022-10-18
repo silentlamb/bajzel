@@ -1,5 +1,3 @@
-use std::num::ParseIntError;
-
 use itertools::Itertools;
 use nom::branch::*;
 use nom::bytes::complete::{is_not, tag, take};
@@ -10,14 +8,17 @@ use nom::combinator::{map, map_res, opt, recognize, value};
 use nom::multi::many0;
 use nom::sequence::{delimited, pair, preceded, tuple};
 use nom::IResult;
+use std::iter::Enumerate;
+use std::num::ParseIntError;
+use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
 // static ARRAY_TYPES: &[&str; 1] = &["bytes"];
-static TYPES: &[&str; 20] = &[
-    "i8", "i32", "i64", "u8", "u32", "u64", "bytes", "ref", "le_u16", "le_u32",
-    "le_u64", "le_i16", "le_i32", "le_i64", "be_u16", "be_u32", "be_u64",
-    "be_i16", "be_i32", "be_i64",
+static TYPES: &[&str; 21] = &[
+    "i8", "i32", "i64", "u8", "u32", "u64", "le_u16", "le_u32", "le_u64",
+    "le_i16", "le_i32", "le_i64", "be_u16", "be_u32", "be_u64", "be_i16",
+    "be_i32", "be_i64", "bytes", "ref", "string",
 ];
-static RESERVED: &[&str; 1] = &["null"];
+static RESERVED: &[&str; 2] = &["null", "lf"];
 
 pub struct Lexer;
 
@@ -138,13 +139,15 @@ impl Lexer {
         map(
             recognize(pair(alpha1, many0(alt((alphanumeric1, tag("_")))))),
             |x: &str| {
-                if TYPES.contains(&x) {
+                let icase_x = x.to_lowercase();
+                let icase_x = icase_x.as_str();
+                if TYPES.contains(&icase_x) {
                     return Token::Type(x);
                 }
-                if RESERVED.contains(&x) {
+                if RESERVED.contains(&icase_x) {
                     return Token::ReservedIdent(x);
                 }
-                match x.to_lowercase().as_str() {
+                match icase_x {
                     // Keywords
                     "as" => Token::As,
                     "define" => Token::Define,
@@ -152,7 +155,7 @@ impl Lexer {
                     "generate" => Token::Generate,
                     "where" => Token::Where,
                     "with" => Token::With,
-                    _ => Token::UserIdent(x),
+                    _ => Token::Ident(x),
                 }
             },
         )(input)
@@ -189,6 +192,7 @@ pub enum Token<'a> {
     Eof,
     From,
     Generate,
+    Ident(&'a str),
     Illegal(&'a str),
     IntegerLiteral(i64),
     LeftParen,
@@ -201,7 +205,117 @@ pub enum Token<'a> {
     Subtract,
     Type(&'a str),
     TypeArray(&'a str, u32),
-    UserIdent(&'a str),
     Where,
     With,
+}
+
+impl<'a> nom::InputLength for Token<'a> {
+    fn input_len(&self) -> usize {
+        1
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Tokens<'a> {
+    pub tokens: &'a [Token<'a>],
+    pub start: usize,
+    pub end: usize,
+}
+
+impl<'a> Tokens<'a> {
+    pub fn new(tokens: &'a [Token]) -> Self {
+        Tokens {
+            tokens,
+            start: 0,
+            end: 0,
+        }
+    }
+}
+
+impl<'a> nom::InputLength for Tokens<'a> {
+    fn input_len(&self) -> usize {
+        self.tokens.len()
+    }
+}
+
+impl<'a> nom::InputTake for Tokens<'a> {
+    fn take(&self, count: usize) -> Self {
+        Tokens {
+            tokens: &self.tokens[0..count],
+            start: 0,
+            end: count,
+        }
+    }
+
+    fn take_split(&self, count: usize) -> (Self, Self) {
+        let (x, y) = self.tokens.split_at(count);
+        let x = Tokens {
+            tokens: x,
+            start: 0,
+            end: x.len(),
+        };
+        let y = Tokens {
+            tokens: y,
+            start: 0,
+            end: y.len(),
+        };
+        (y, x)
+    }
+}
+
+impl<'a> nom::Slice<Range<usize>> for Tokens<'a> {
+    fn slice(&self, range: Range<usize>) -> Self {
+        Tokens {
+            tokens: self.tokens.slice(range.clone()),
+            start: self.start + range.start,
+            end: self.end + range.end,
+        }
+    }
+}
+
+impl<'a> nom::Slice<RangeFrom<usize>> for Tokens<'a> {
+    fn slice(&self, range: RangeFrom<usize>) -> Self {
+        self.slice(range.start..self.end - self.start)
+    }
+}
+
+impl<'a> nom::Slice<RangeTo<usize>> for Tokens<'a> {
+    fn slice(&self, range: RangeTo<usize>) -> Self {
+        self.slice(0..range.end)
+    }
+}
+
+impl<'a> nom::Slice<RangeFull> for Tokens<'a> {
+    fn slice(&self, _range: RangeFull) -> Self {
+        self.clone()
+    }
+}
+
+impl<'a> nom::InputIter for Tokens<'a> {
+    type Item = &'a Token<'a>;
+    type Iter = Enumerate<::std::slice::Iter<'a, Token<'a>>>;
+    type IterElem = ::std::slice::Iter<'a, Token<'a>>;
+
+    fn iter_indices(&self) -> Self::Iter {
+        self.tokens.iter().enumerate()
+    }
+
+    fn iter_elements(&self) -> Self::IterElem {
+        self.tokens.iter()
+    }
+
+    fn position<P>(&self, predicate: P) -> Option<usize>
+    where
+        P: Fn(Self::Item) -> bool,
+    {
+        self.tokens.iter().position(predicate)
+    }
+
+    fn slice_index(&self, count: usize) -> Result<usize, nom::Needed> {
+        if self.tokens.len() >= count {
+            Ok(count)
+        } else {
+            Err(nom::Needed::Unknown)
+        }
+    }
 }

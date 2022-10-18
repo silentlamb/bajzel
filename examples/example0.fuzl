@@ -1,0 +1,11 @@
+DEFINE string_cmd
+    string AS cmd       -> LEN(4)
+    " "
+    string AS sub_cmd   -> LEN(1 10)
+    " "
+    i32 AS param        -> RANGE(0 5)
+
+GENERATE string_cmd WITH
+    OUT_MIN = 5
+    OUT_MAX = 32
+    TERM    = LF

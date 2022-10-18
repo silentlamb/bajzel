@@ -11,7 +11,7 @@ WHERE
     payload_len -> RANGE(0 4096),
     delim2      -> DELIM,
     payload     -> LEN(payload_len),
-    mem_range   -> REF(int_pair)
+    mem_range   -> DEF(int_pair)
 
 DEFINE int_pair
     i32 AS x1

@@ -1,8 +1,8 @@
 DEFINE bmp_header
-    `42 4d`     AS magic    # "BM" magic field
-    le_u16      AS size     # The size of BMP file in bytes
+    `42 4d`  AS magic       # "BM" magic field
+    le_u16   AS size        # The size of BMP file in bytes
     bytes[4]                # Reserved (0)
-    le_u16      AS offset   # starting address of the byte where the pixel array can be found
+    le_u16   AS offset      # starting address of the byte where the pixel array can be found
 WHERE
     offset -> VALUE(14 + 40)
 
