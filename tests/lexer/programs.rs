@@ -1,4 +1,4 @@
-use bajzel_lib::lexer::{Lexer, Token};
+use bajzel_lib::lexer::{lex_tokens, Token};
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 
@@ -39,7 +39,7 @@ fn string_command() {
         Token::Eof,
     ]);
 
-    let actual = Lexer::lex_tokens(input);
+    let actual = lex_tokens(input);
     assert_eq!(actual, expected);
 }
 
@@ -53,7 +53,7 @@ fn int_command() {
             " " AS delim2
             i8  AS param2
     "#;
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = Ok(vec![
         Token::Define,
         Token::Ident("ints_command"),
@@ -85,7 +85,7 @@ fn uint_command() {
             u32 AS x2
             u64 AS x3
     "#;
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = Ok(vec![
         Token::Define,
         Token::Ident("uints_command"),
@@ -113,7 +113,7 @@ fn anynomous_fields() {
         " "
         i8  AS param2
     "#;
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = Ok(vec![
         Token::Define,
         Token::Ident("ints_command"),
@@ -143,9 +143,9 @@ fn separate_lines_dont_matter() {
     "#;
     let input_short = r#"DEFINE ints_command i32 AS cmd GENERATE ints_command WITH TERM = null"#;
     let output_long =
-        Lexer::lex_tokens(input_long).expect("Long program is lexed properly");
-    let output_short = Lexer::lex_tokens(input_short)
-        .expect("Short program is lexed properly");
+        lex_tokens(input_long).expect("Long program is lexed properly");
+    let output_short =
+        lex_tokens(input_short).expect("Short program is lexed properly");
     assert_eq!(output_long, output_short);
 }
 
@@ -157,7 +157,7 @@ fn generate_where_int_props() {
     WHERE
         cmd -> RANGE(0 5) FORMAT(hex)
     "#;
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = Ok(vec![
         Token::Define,
         Token::Ident("cmd"),
@@ -196,7 +196,7 @@ fn const_bytes_input() {
         itertools::join(expected_bytes1, " "),
         itertools::join(expected_bytes2, " "),
     );
-    let output = Lexer::lex_tokens(input.as_str());
+    let output = lex_tokens(input.as_str());
 
     let conv_fn = |x| u8::from_str_radix(x, 16).unwrap();
     let expected_bytes1 =
@@ -222,7 +222,7 @@ fn const_bytes_input_invalid() {
     DEFINE hex_cmd
         `g5 d6 ha z4`
     "#;
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = Ok(vec![
         Token::Define,
         Token::Ident("hex_cmd"),

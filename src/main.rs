@@ -1,4 +1,4 @@
-use bajzel_lib::lexer::Lexer;
+use bajzel_lib::lexer::lex_tokens;
 use clap::{arg, Command};
 
 fn run() -> Result<(), String> {
@@ -11,8 +11,8 @@ fn run() -> Result<(), String> {
     let input = std::fs::read_to_string(path)
         .map_err(|_e| "Could not read file".to_string())?;
 
-    let tokens = Lexer::lex_tokens(input.as_str())
-        .map_err(|_| String::from("Lexer failed"))?;
+    let tokens =
+        lex_tokens(input.as_str()).map_err(|_| String::from("Lexer failed"))?;
 
     for token in tokens.iter() {
         println!("Token::{:?},", token);

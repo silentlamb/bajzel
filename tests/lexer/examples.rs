@@ -1,11 +1,11 @@
-use bajzel_lib::lexer::{Lexer, Token};
+use bajzel_lib::lexer::{lex_tokens, Token};
 use pretty_assertions::assert_eq;
 use std::fs::read_to_string;
 
 #[test]
 fn example0() {
     let input = read_to_string("./examples/example0.fuzl").unwrap();
-    let output = Lexer::lex_tokens(input.as_str());
+    let output = lex_tokens(input.as_str());
     let expected = vec![
         Token::Define,
         // Field 1
@@ -64,7 +64,7 @@ fn example0() {
 #[test]
 fn example1() {
     let input = read_to_string("./examples/example1.fuzl").unwrap();
-    let output = Lexer::lex_tokens(input.as_str());
+    let output = lex_tokens(input.as_str());
     let expected = vec![
         Token::Define,
         Token::Ident("repl_command"),
@@ -173,7 +173,7 @@ fn example1() {
 #[test]
 fn example2_bitmap() {
     let input = read_to_string("./examples/example2.fuzl").unwrap();
-    let output = Lexer::lex_tokens(input.as_str());
+    let output = lex_tokens(input.as_str());
     let expected = vec![
         // Bitmap header
         Token::Define,

@@ -1,6 +1,6 @@
 use bajzel_lib::{
     lexer::{Token, Tokens},
-    parser::{Expr, Literal, Parser, Program, Statement},
+    parser::{parse_tokens, Expr, Literal, Program, Statement},
 };
 use pretty_assertions::assert_eq;
 
@@ -12,11 +12,14 @@ fn define_group() {
         Token::Eof,
     ];
     let input = Tokens::new(&input);
-    let output = Parser::parse_tokens(input);
+    let output = parse_tokens(input);
 
-    let expected: Program = vec![Statement::StartGroupDefinition(
-        "long_string_to_mess_with_formatter".into(),
-    )]
+    let expected: Program = vec![
+        Statement::StartGroupDefinition(
+            "long_string_to_mess_with_formatter".into(),
+        ),
+        Statement::Run,
+    ]
     .into();
 
     assert_eq!(output, Ok(expected));
@@ -34,7 +37,7 @@ fn define_group_with_fields() {
         Token::Eof,
     ];
     let input = Tokens::new(&input);
-    let output = Parser::parse_tokens(input);
+    let output = parse_tokens(input);
 
     let expected: Program = vec![
         Statement::StartGroupDefinition(
@@ -42,6 +45,7 @@ fn define_group_with_fields() {
         ),
         Statement::DefineVariableField("u32".into(), Some("size".into())),
         Statement::DefineConstField(Literal::IntegerLiteral(42), None),
+        Statement::Run,
     ]
     .into();
     assert_eq!(output, Ok(expected));
@@ -71,7 +75,7 @@ fn define_group_where_fields_updated() {
         Token::Eof,
     ];
     let input = Tokens::new(&input);
-    let output = Parser::parse_tokens(input);
+    let output = parse_tokens(input);
 
     let expected: Program = vec![
         Statement::StartGroupDefinition("cmd".into()),
@@ -93,6 +97,7 @@ fn define_group_where_fields_updated() {
             "FORMAT".into(),
             Expr::LiteralExpr(Literal::StringLiteral("hex".into())),
         ),
+        Statement::Run,
     ]
     .into();
     assert_eq!(output, Ok(expected));
@@ -106,11 +111,14 @@ fn define_generator() {
         Token::Eof,
     ];
     let input = Tokens::new(&input);
-    let output = Parser::parse_tokens(input);
+    let output = parse_tokens(input);
 
-    let expected: Program = vec![Statement::StartGeneratorDefinition(
-        "very_long_imaginary_command".into(),
-    )]
+    let expected: Program = vec![
+        Statement::StartGeneratorDefinition(
+            "very_long_imaginary_command".into(),
+        ),
+        Statement::Run,
+    ]
     .into();
 
     assert_eq!(output, Ok(expected));
@@ -134,7 +142,7 @@ fn generator_params() {
         Token::Eof,
     ];
     let input = Tokens::new(&input);
-    let output = Parser::parse_tokens(input);
+    let output = parse_tokens(input);
     let expected: Program = vec![
         Statement::StartGeneratorDefinition("cmd".into()),
         Statement::UpdateParam(
@@ -149,6 +157,7 @@ fn generator_params() {
             "TERM".into(),
             Expr::LiteralExpr(Literal::Reserved("LF".into())),
         ),
+        Statement::Run,
     ]
     .into();
 

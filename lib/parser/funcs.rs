@@ -1,6 +1,5 @@
 use super::{Expr, Ident, Literal, Program, Statement, Tokens};
 use crate::lexer::Token;
-use itertools::Itertools;
 use nom::{
     branch::alt,
     bytes::complete::take,
@@ -15,7 +14,11 @@ pub(crate) fn parse_program(input: Tokens) -> IResult<Tokens, Program> {
     let parse_stmt = many0(parse_statement);
     let parse_prog = terminated(parse_stmt, eof_tag);
     // map(parse_prog, flatten_program)(input)
-    map(parse_prog, |x| flatten_vec(x).into())(input)
+    map(parse_prog, |x| {
+        let mut x = flatten_vec(x);
+        x.push(Statement::Run);
+        x.into()
+    })(input)
 }
 
 fn parse_statement(input: Tokens) -> IResult<Tokens, Vec<Statement>> {

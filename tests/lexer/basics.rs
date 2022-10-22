@@ -1,11 +1,11 @@
-use bajzel_lib::lexer::{Lexer, Token};
+use bajzel_lib::lexer::{lex_tokens, Token};
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 
 #[test]
 fn keywords() {
     let input = "DEFINE AS WITH WHERE";
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![
         Token::Define,
         Token::As,
@@ -19,7 +19,7 @@ fn keywords() {
 #[test]
 fn operators() {
     let input = "= ->";
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![Token::Assign, Token::RightArrow, Token::Eof];
     assert_eq!(output, Ok(expected));
 }
@@ -27,7 +27,7 @@ fn operators() {
 #[test]
 fn punctuations() {
     let input = "( )";
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![Token::LeftParen, Token::RightParen, Token::Eof];
     assert_eq!(output, Ok(expected));
 }
@@ -35,7 +35,7 @@ fn punctuations() {
 #[test]
 fn types() {
     let input = "i8 i32 i64 u8 u32 u64";
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![
         Token::Type("i8"),
         Token::Type("i32"),
@@ -51,7 +51,7 @@ fn types() {
 #[test]
 fn reserved_idents() {
     let input = "null";
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![Token::ReservedIdent("null"), Token::Eof];
     assert_eq!(output, Ok(expected));
 }
@@ -59,7 +59,7 @@ fn reserved_idents() {
 #[test]
 fn const_bytes() {
     let input = "`de ad c0 0f fe`";
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![Token::Bytes(vec![222, 173, 192, 15, 254]), Token::Eof];
     assert_eq!(output, Ok(expected));
 }
@@ -67,7 +67,7 @@ fn const_bytes() {
 #[test]
 fn const_strings() {
     let input = r#""Hello, world!""#;
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![Token::StringLiteral("Hello, world!"), Token::Eof];
     assert_eq!(output, Ok(expected));
 }
@@ -75,7 +75,7 @@ fn const_strings() {
 #[test]
 fn const_integers() {
     let input = "0 -9223372036854775808 9223372036854775807";
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![
         Token::IntegerLiteral(0),
         Token::IntegerLiteral(-9223372036854775808),
@@ -91,7 +91,7 @@ fn const_integers_overflowing() {
         -170141183460469231731687303715884105728
         170141183460469231731687303715884105727
     "#;
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let invalids = {
         if let Ok(ref tokens) = output {
             tokens
@@ -132,7 +132,7 @@ fn const_integers_overflowing() {
 #[test]
 fn const_integers_double_minus() {
     let input = "--1";
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![Token::Subtract, Token::IntegerLiteral(-1), Token::Eof];
     assert_eq!(output, Ok(expected));
 }
@@ -140,7 +140,7 @@ fn const_integers_double_minus() {
 #[test]
 fn const_strings_emoji() {
     let input = "\"🙈🙉🙊\"";
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![Token::StringLiteral("🙈🙉🙊"), Token::Eof];
     assert_eq!(output, Ok(expected));
 }
@@ -148,7 +148,7 @@ fn const_strings_emoji() {
 #[test]
 fn emoji_idents_not_allowed() {
     let input = "🙈🙉🙊";
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![
         Token::Illegal("🙈"),
         Token::Illegal("🙉"),
@@ -161,7 +161,7 @@ fn emoji_idents_not_allowed() {
 #[test]
 fn ref_token() {
     let input = "ref";
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![Token::Type("ref"), Token::Eof];
     assert_eq!(output, Ok(expected));
 }
@@ -172,7 +172,7 @@ fn comments_are_discarded() {
         42 # 43
         44 # 45 46 47
     "#;
-    let output = Lexer::lex_tokens(input);
+    let output = lex_tokens(input);
     let expected = vec![
         Token::IntegerLiteral(42),
         Token::IntegerLiteral(44),
