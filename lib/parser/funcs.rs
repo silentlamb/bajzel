@@ -24,7 +24,7 @@ pub(crate) fn parse_program(input: Tokens) -> IResult<Tokens, Program> {
 fn parse_statement(input: Tokens) -> IResult<Tokens, Vec<Statement>> {
     alt((
         map(parse_define_group_statement, single_to_vec),
-        map(parse_define_field_statement, single_to_vec),
+        parse_define_field_statement,
         map(parse_update_field_section_statement, single_to_vec),
         parse_update_field_statement,
         map(parse_define_generator_statement, single_to_vec),
@@ -33,29 +33,59 @@ fn parse_statement(input: Tokens) -> IResult<Tokens, Vec<Statement>> {
 }
 
 fn parse_define_group_statement(input: Tokens) -> IResult<Tokens, Statement> {
-    map(preceded(define_tag, parse_ident), |ident| {
-        Statement::StartGroupDefinition(ident)
-    })(input)
+    map(
+        preceded(define_tag, parse_ident),
+        Statement::StartGroupDefinition,
+    )(input)
 }
 
 fn parse_define_generator_statement(
     input: Tokens,
 ) -> IResult<Tokens, Statement> {
-    let parser = delimited(generate_tag, parse_ident, opt(with_tag));
-    map(parser, |ident| Statement::StartGeneratorDefinition(ident))(input)
+    map(
+        delimited(generate_tag, parse_ident, opt(with_tag)),
+        Statement::StartGeneratorDefinition,
+    )(input)
 }
 
-fn parse_define_field_statement(input: Tokens) -> IResult<Tokens, Statement> {
-    let vp = pair(parse_type, opt(preceded(as_tag, parse_ident)));
-    let var_field = map(vp, |(name, alias)| {
-        Statement::DefineVariableField(name, alias)
-    });
-
-    let cp = pair(parse_literal, opt(preceded(as_tag, parse_ident)));
-    let const_field = map(cp, |(value, alias)| {
-        Statement::DefineConstField(value, alias)
-    });
-    alt((var_field, const_field))(input)
+fn parse_define_field_statement(
+    input: Tokens,
+) -> IResult<Tokens, Vec<Statement>> {
+    alt((
+        map(
+            pair(
+                parse_type,
+                opt(preceded(
+                    as_tag,
+                    pair(
+                        parse_ident,
+                        opt(preceded(
+                            right_arrow_tag,
+                            many1(parse_update_fields),
+                        )),
+                    ),
+                )),
+            ),
+            |(name, extra)| {
+                let (alias, updates) = match extra {
+                    Some((alias, updates)) => (Some(alias), updates),
+                    None => (None, None),
+                };
+                let mut res =
+                    vec![Statement::DefineVariableField(name, alias.clone())];
+                if let Some(statements) = updates {
+                    let alias = alias.expect("Guaranteed to be Some");
+                    res.push(Statement::MakeCurrentField(alias));
+                    res.extend(statements.into_iter());
+                }
+                res
+            },
+        ),
+        map(
+            pair(parse_literal, opt(preceded(as_tag, parse_ident))),
+            |(value, alias)| vec![Statement::DefineConstField(value, alias)],
+        ),
+    ))(input)
 }
 
 fn parse_update_field_statement(
@@ -144,7 +174,7 @@ fn parse_update_fields(input: Tokens) -> IResult<Tokens, Statement> {
 }
 
 fn parse_expr(input: Tokens) -> IResult<Tokens, Expr> {
-    alt((map(parse_literal, |x| Expr::LiteralExpr(x)),))(input)
+    alt((map(parse_literal, Expr::LiteralExpr),))(input)
 }
 
 // https://github.com/Rydgel/monkey-rust/blob/master/lib/parser/mod.rs#L15

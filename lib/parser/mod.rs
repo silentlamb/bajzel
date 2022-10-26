@@ -26,16 +26,8 @@ pub fn parse_tokens(tokens: Tokens) -> Result<Program, String> {
         })
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Program(Vec<Statement>);
-
-impl Deref for Program {
-    type Target = Vec<Statement>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 impl From<Vec<Statement>> for Program {
     fn from(src: Vec<Statement>) -> Self {
@@ -43,7 +35,16 @@ impl From<Vec<Statement>> for Program {
     }
 }
 
-#[derive(Debug, PartialEq)]
+impl std::iter::IntoIterator for Program {
+    type Item = Statement;
+    type IntoIter = std::vec::IntoIter<Statement>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ident(String);
 
 impl Deref for Ident {
@@ -60,7 +61,7 @@ impl From<&str> for Ident {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
     /// Create a new definition group and set it as active
     ///
@@ -164,7 +165,7 @@ pub enum Statement {
     UpdateParam(Ident, Expr),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     /// Single literal (string, integer, etc)
     ///
@@ -179,7 +180,7 @@ pub enum Expr {
     Group(Vec<Expr>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Literal {
     IntegerLiteral(i64),
     StringLiteral(String),

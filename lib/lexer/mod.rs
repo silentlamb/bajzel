@@ -1,3 +1,5 @@
+#![allow(clippy::match_like_matches_macro)]
+
 mod funcs;
 
 use itertools::Itertools;
@@ -10,9 +12,9 @@ use self::funcs::{comment_to_eol, space_separated_token};
 
 /// Entrypoint - lex input into tokens
 ///
-pub fn lex_tokens<'a>(
-    input: &'a str,
-) -> Result<Vec<Token<'a>>, nom::Err<nom::error::Error<&str>>> {
+pub fn lex_tokens(
+    input: &str,
+) -> Result<Vec<Token<'_>>, nom::Err<nom::error::Error<&str>>> {
     many0(alt((comment_to_eol(), space_separated_token())))(input).map(
         |(_, tokens)| {
             itertools::chain(
@@ -27,7 +29,7 @@ pub fn lex_tokens<'a>(
     )
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Token<'a> {
     Add,
     As,
@@ -63,7 +65,7 @@ impl<'a> nom::InputLength for Token<'a> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tokens<'a> {
     pub tokens: &'a [Token<'a>],
     pub start: usize,
@@ -135,7 +137,7 @@ impl<'a> nom::Slice<RangeTo<usize>> for Tokens<'a> {
 
 impl<'a> nom::Slice<RangeFull> for Tokens<'a> {
     fn slice(&self, _range: RangeFull) -> Self {
-        self.clone()
+        *self
     }
 }
 

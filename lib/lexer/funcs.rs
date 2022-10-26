@@ -61,7 +61,7 @@ fn lex_string(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
 fn lex_bytes(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
     map(
         map_res(delimited(char('`'), is_not("`"), char('`')), |x: &str| {
-            x.split(" ")
+            x.split(' ')
                 .map(|s| u8::from_str_radix(s, 16))
                 .collect::<Vec<_>>()
                 .into_iter()
@@ -71,14 +71,14 @@ fn lex_bytes(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
     )(input)
 }
 
-fn lex_ident_array<'a>(input: &'a str) -> IResult<&'a str, Token<'a>> {
+fn lex_ident_array(input: &str) -> IResult<&str, Token<'_>> {
     map(
         tuple((
             recognize(pair(alpha1, many0(alt((alphanumeric1, tag("_")))))),
             delimited(
                 char('['),
-                map_res(recognize(pair(opt(char('-')), digit1)), |x| {
-                    u32::from_str_radix(x, 10)
+                map_res(recognize(pair(opt(char('-')), digit1)), |x: &str| {
+                    x.parse::<u32>()
                 }),
                 char(']'),
             ),
@@ -89,7 +89,7 @@ fn lex_ident_array<'a>(input: &'a str) -> IResult<&'a str, Token<'a>> {
 
 /// Lex input into an indentifier
 ///
-fn lex_ident<'a>(input: &'a str) -> IResult<&'a str, Token<'a>> {
+fn lex_ident(input: &str) -> IResult<&str, Token<'_>> {
     map(
         recognize(pair(alpha1, many0(alt((alphanumeric1, tag("_")))))),
         |x: &str| {
@@ -119,8 +119,9 @@ fn lex_ident<'a>(input: &'a str) -> IResult<&'a str, Token<'a>> {
 ///
 fn lex_integer(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
     map(
-        map_res(recognize(pair(opt(char('-')), digit1)), |x| {
-            i64::from_str_radix(x, 10)
+        map_res(recognize(pair(opt(char('-')), digit1)), |x: &str| {
+            // i64::from_str_radix(x, 10)
+            x.parse::<i64>()
         }),
         Token::IntegerLiteral,
     )(input)
@@ -129,7 +130,7 @@ fn lex_integer(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
 /// Lex input into illegal token
 ///
 fn lex_illegal(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
-    map(take(1usize), |x| Token::Illegal(x))(input)
+    map(take(1usize), Token::Illegal)(input)
 }
 
 /// Lex input into an operator
