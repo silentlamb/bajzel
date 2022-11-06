@@ -5,25 +5,28 @@ DEFINE repl_command
     ","    AS delim2
     bytes  AS payload
     ref    AS mem_range
-WHERE
-    prefix      -> NO_MUTATE,
-    delim1      -> DELIM NO_MUTATE,
-    payload_len -> RANGE(0 4096),
-    delim2      -> DELIM,
-    payload     -> LEN(payload_len),
-    mem_range   -> DEF(int_pair)
 
-DEFINE int_pair
+ WHERE
+
+ #    prefix      -> NO_MUTATE,
+ #    delim1      -> DELIM NO_MUTATE,
+    payload_len   -> RANGE(0 4096),
+
+ #    delim2      -> DELIM,
+ #    payload     -> LEN(payload_len),
+      mem_range   -> TO(int_pair)
+ #
+ DEFINE int_pair
     i32 AS x1
     "," AS delim
     i32 AS x2
-
-WHERE
-    x1    -> RANGE(0 15),
-    x2    -> RANGE(0 255),
-    delim -> DELIM
+ 
+ WHERE
+     x1    -> RANGE(0 15),
+     x2    -> RANGE(0 255),
+ #    delim -> DELIM
 
 GENERATE repl_command WITH
-    MIN  = 5
-    MAX  = 4096
+    OUT_MIN  = 5
+    OUT_MAX  = 4096
     TERM = null

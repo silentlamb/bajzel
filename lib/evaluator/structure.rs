@@ -7,7 +7,26 @@ use super::{eval_expr_to_i64, syntax_err};
 
 #[derive(Debug, Default)]
 pub struct GroupDefinition {
-    pub fields: Vec<Field>,
+    fields: Vec<Field>,
+}
+
+impl GroupDefinition {
+    pub(crate) fn add_field(&mut self, field: Field) {
+        self.fields.push(field);
+    }
+
+    pub(crate) fn find_field_mut(
+        &mut self,
+        cur_field: &String,
+    ) -> Option<&mut Field> {
+        self.fields
+            .iter_mut()
+            .find(|x| x.alias.as_ref() == Some(cur_field))
+    }
+
+    pub(crate) fn fields_iter(&self) -> impl Iterator<Item = &Field> {
+        self.fields.iter()
+    }
 }
 
 #[derive(Debug)]
@@ -43,28 +62,36 @@ pub enum FieldDefinition {
     AsciiString(AsciiStringDef),
 
     ByteNumber(ByteNumberDef),
+
+    Bytes(BytesDef),
 }
 
 #[derive(Debug)]
 pub struct TextNumberDef {
-    format: NumberFormat,
-    min_value: i128,
-    max_value: i128,
-    display: Option<NumberDisplayFormat>,
+    pub format: NumberFormat,
+    pub min_value: i128,
+    pub max_value: i128,
+    pub display: Option<NumberDisplayFormat>,
 }
 
 #[derive(Debug)]
 pub struct ByteNumberDef {
-    format: NumberFormat,
-    endianess: ByteOrder,
-    min_value: i128,
-    max_value: i128,
+    pub format: NumberFormat,
+    pub endianess: ByteOrder,
+    pub min_value: i128,
+    pub max_value: i128,
+}
+
+#[derive(Debug)]
+pub struct BytesDef {
+    pub length_min: usize,
+    pub length_max: usize,
 }
 
 #[derive(Debug)]
 pub struct AsciiStringDef {
-    length_min: usize,
-    length_max: usize,
+    pub length_min: usize,
+    pub length_max: usize,
 }
 
 #[derive(Debug)]
@@ -212,6 +239,7 @@ impl TextNumberDef {
                     syntax_err("RANGE(min max) expects exactly 2 values")
                 }
             }
+            _ => syntax_err("LEN(...): unsupported expression"),
         }
     }
 }
@@ -280,11 +308,81 @@ impl AsciiStringDef {
                     syntax_err("string literals: ")
                 }
             }
+            _ => syntax_err("LEN(...): unsupported expression"),
         }
     }
 }
 
 impl Default for AsciiStringDef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BytesDef {
+    pub fn new() -> Self {
+        Self {
+            length_min: 0,
+            length_max: 4096,
+        }
+    }
+
+    pub fn update(
+        &mut self,
+        attr_name: &str,
+        expr: Expr,
+    ) -> Result<(), BajzelError> {
+        match attr_name {
+            "LEN" => self.set_len(expr),
+            x => syntax_err(format!("bytes: unsupported attribute ({})", x)),
+        }
+    }
+
+    fn set_len(&mut self, expr: Expr) -> Result<(), BajzelError> {
+        match expr {
+            Expr::LiteralExpr(literal) => match literal {
+                Literal::IntegerLiteral(value) => {
+                    if value < 0 {
+                        return syntax_err(
+                            "LEN(value): value < 0 is not allowed",
+                        );
+                    }
+                    // Single valuye means length is constant
+                    self.length_min = value as usize;
+                    self.length_max = value as usize;
+                    Ok(())
+                }
+                x => syntax_err(
+                    "string literals: unsupported literal expression",
+                ),
+            },
+            Expr::Group(v) => {
+                if v.len() == 2 {
+                    let min = eval_expr_to_i64(&v[0])?;
+                    let max = eval_expr_to_i64(&v[1])?;
+                    if min > max {
+                        return syntax_err(
+                            "LEN(min max): min > max is not allowed",
+                        );
+                    }
+                    if min < 0 {
+                        return syntax_err(
+                            "LEN(min max): min < 0 is not allowed",
+                        );
+                    }
+                    self.length_min = min as usize;
+                    self.length_max = max as usize;
+                    Ok(())
+                } else {
+                    syntax_err("string literals: ")
+                }
+            }
+            _ => syntax_err("LEN(...): unsupported expression"),
+        }
+    }
+}
+
+impl Default for BytesDef {
     fn default() -> Self {
         Self::new()
     }

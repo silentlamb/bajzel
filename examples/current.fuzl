@@ -3,7 +3,10 @@ DEFINE string_cmd
     " "
     string AS sub_cmd   -> LEN(1 10),
     " "
-    i32 AS param        -> RANGE(0 5),
+    i32 AS param
+WHERE
+    param               -> RANGE(0 5),
+
 
 GENERATE string_cmd WITH
     OUT_MIN = 5

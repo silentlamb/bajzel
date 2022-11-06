@@ -5,6 +5,7 @@ mod funcs;
 use itertools::Itertools;
 use nom::branch::*;
 use nom::multi::many0;
+use std::borrow::Cow;
 use std::iter::Enumerate;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
@@ -15,7 +16,7 @@ use self::funcs::{comment_to_eol, space_separated_token};
 pub fn lex_tokens(
     input: &str,
 ) -> Result<Vec<Token<'_>>, nom::Err<nom::error::Error<&str>>> {
-    many0(alt((comment_to_eol(), space_separated_token())))(input).map(
+    many0(alt((comment_to_eol, space_separated_token)))(input).map(
         |(_, tokens)| {
             itertools::chain(
                 tokens.into_iter().filter(|token| match token {
@@ -48,7 +49,7 @@ pub enum Token<'a> {
     LeftParen,
     Multiply,
     Reference,
-    ReservedIdent(&'a str),
+    ReservedIdent(Cow<'a, str>),
     RightArrow,
     RightParen,
     StringLiteral(&'a str),

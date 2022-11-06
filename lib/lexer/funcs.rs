@@ -5,13 +5,13 @@ use nom::character::complete::{
 };
 use nom::combinator::{map, map_res, opt, recognize, value};
 use nom::multi::many0;
-use nom::sequence::{delimited, pair, preceded, tuple};
+use nom::sequence::{delimited, pair, tuple};
 use nom::IResult;
+use std::borrow::Cow;
 use std::num::ParseIntError;
 
 use super::Token;
 
-// static ARRAY_TYPES: &[&str; 1] = &["bytes"];
 static TYPES: &[&str; 21] = &[
     "i8", "i32", "i64", "u8", "u32", "u64", "le_u16", "le_u32", "le_u64",
     "le_i16", "le_i32", "le_i64", "be_u16", "be_u32", "be_u64", "be_i16",
@@ -19,22 +19,25 @@ static TYPES: &[&str; 21] = &[
 ];
 static RESERVED: &[&str; 2] = &["null", "lf"];
 
-pub(crate) fn comment_to_eol<'a>(
-) -> impl FnMut(&'a str) -> IResult<&'a str, Token<'a>> {
-    preceded(
-        multispace0,
-        value(Token::Comment, pair(char('#'), is_not("\r\n"))),
-    )
+/// Matches any number of whitespaces followed by # character followed by anything that's not \n
+///
+pub(crate) fn comment_to_eol(input: &str) -> IResult<&str, Token<'_>> {
+    value(
+        Token::Comment,
+        delimited(multispace0, char('#'), is_not("\n")),
+    )(input)
 }
 
-pub(crate) fn space_separated_token<'a>(
-) -> impl FnMut(&'a str) -> IResult<&'a str, Token<'a>> {
-    delimited(multispace0, lex_token, multispace0)
+/// Matches any known token preceded with any number of whitespaces followed
+/// by any number of whitespaces.
+///
+pub(crate) fn space_separated_token(input: &str) -> IResult<&str, Token<'_>> {
+    delimited(multispace0, lex_token, multispace0)(input)
 }
 
 /// Lex input into a single token
 ///
-fn lex_token(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
+fn lex_token(input: &str) -> IResult<&str, Token<'_>> {
     alt((
         lex_string,
         lex_bytes,
@@ -43,13 +46,14 @@ fn lex_token(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
         lex_integer,
         lex_operator,
         lex_punctuations,
+        lex_comment, // No idea why "comment_to_eol" doesn't solve all comment issues, but this one helps
         lex_illegal,
     ))(input)
 }
 
 /// Lex input into a string literal
 ///
-fn lex_string(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
+fn lex_string(input: &str) -> IResult<&str, Token<'_>> {
     map(
         delimited(char('"'), is_not("\""), char('"')),
         Token::StringLiteral,
@@ -58,7 +62,9 @@ fn lex_string(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
 
 /// Lex input into a byte sequence
 ///
-fn lex_bytes(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
+/// Byte sequence syntax: `41 42 43 44 4f`
+///
+fn lex_bytes(input: &str) -> IResult<&str, Token<'_>> {
     map(
         map_res(delimited(char('`'), is_not("`"), char('`')), |x: &str| {
             x.split(' ')
@@ -99,7 +105,7 @@ fn lex_ident(input: &str) -> IResult<&str, Token<'_>> {
                 return Token::Type(x);
             }
             if RESERVED.contains(&icase_x) {
-                return Token::ReservedIdent(x);
+                return Token::ReservedIdent(Cow::Owned(x.to_uppercase()));
             }
             match icase_x {
                 // Keywords
@@ -117,7 +123,7 @@ fn lex_ident(input: &str) -> IResult<&str, Token<'_>> {
 
 /// Lex input into an integer
 ///
-fn lex_integer(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
+fn lex_integer(input: &str) -> IResult<&str, Token<'_>> {
     map(
         map_res(recognize(pair(opt(char('-')), digit1)), |x: &str| {
             // i64::from_str_radix(x, 10)
@@ -129,13 +135,13 @@ fn lex_integer(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
 
 /// Lex input into illegal token
 ///
-fn lex_illegal(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
+fn lex_illegal(input: &str) -> IResult<&str, Token<'_>> {
     map(take(1usize), Token::Illegal)(input)
 }
 
 /// Lex input into an operator
 ///
-fn lex_operator(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
+fn lex_operator(input: &str) -> IResult<&str, Token<'_>> {
     // For a now it's only assignment operator, but let's keep it this way
     alt((
         map(tag("="), |_| Token::Assign),
@@ -148,7 +154,7 @@ fn lex_operator(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
 
 /// Lex input into punctuations
 ///
-fn lex_punctuations(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
+fn lex_punctuations(input: &str) -> IResult<&str, Token<'_>> {
     alt((
         map(tag("("), |_| Token::LeftParen),
         map(tag(")"), |_| Token::RightParen),
@@ -156,4 +162,8 @@ fn lex_punctuations(input: &'_ str) -> IResult<&'_ str, Token<'_>> {
         map(tag("$"), |_| Token::Reference),
         map(tag(":"), |_| Token::Colon),
     ))(input)
+}
+
+fn lex_comment(input: &str) -> IResult<&str, Token<'_>> {
+    map(tag("#"), |_| Token::Comment)(input)
 }

@@ -1,6 +1,7 @@
 use bajzel_lib::lexer::{lex_tokens, Token};
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
+use std::borrow::Cow;
 
 #[test]
 fn keywords() {
@@ -52,7 +53,8 @@ fn types() {
 fn reserved_idents() {
     let input = "null";
     let output = lex_tokens(input);
-    let expected = vec![Token::ReservedIdent("null"), Token::Eof];
+    let expected =
+        vec![Token::ReservedIdent(Cow::Borrowed("NULL")), Token::Eof];
     assert_eq!(output, Ok(expected));
 }
 
@@ -96,10 +98,7 @@ fn const_integers_overflowing() {
         if let Ok(ref tokens) = output {
             tokens
                 .iter()
-                .filter(|token| match token {
-                    Token::Illegal(_) => true,
-                    _ => false,
-                })
+                .filter(|token| matches!(token, Token::Illegal(_)))
                 .count()
         } else {
             0
@@ -112,10 +111,7 @@ fn const_integers_overflowing() {
     let output = output.map(|tokens| {
         tokens
             .into_iter()
-            .filter(|token| match token {
-                Token::Illegal(_) => false,
-                _ => true,
-            })
+            .filter(|token| !matches!(token, Token::Illegal(_)))
             .collect_vec()
     });
 

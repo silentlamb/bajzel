@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bajzel_lib::lexer::{lex_tokens, Token};
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
@@ -35,7 +37,7 @@ fn string_command() {
         Token::IntegerLiteral(4096),
         Token::Ident("TERM"),
         Token::Assign,
-        Token::ReservedIdent("null"),
+        Token::ReservedIdent(Cow::Borrowed("NULL")),
         Token::Eof,
     ]);
 

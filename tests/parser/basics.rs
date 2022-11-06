@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bajzel_lib::{
     lexer::{Token, Tokens},
     parser::{parse_tokens, Expr, Literal, Program, Statement},
@@ -72,6 +74,7 @@ fn define_group_where_fields_updated() {
         Token::LeftParen,
         Token::StringLiteral("hex"),
         Token::RightParen,
+        Token::Comma,
         Token::Eof,
     ];
     let input = Tokens::new(&input);
@@ -138,7 +141,7 @@ fn generator_params() {
         Token::IntegerLiteral(42),
         Token::Ident("TERM"),
         Token::Assign,
-        Token::ReservedIdent("LF"),
+        Token::ReservedIdent(Cow::Borrowed("LF")),
         Token::Eof,
     ];
     let input = Tokens::new(&input);

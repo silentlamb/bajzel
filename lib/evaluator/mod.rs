@@ -5,8 +5,8 @@ const DEBUG_STATE: bool = false;
 use self::{
     generator::GenDefinition,
     structure::{
-        AsciiStringDef, ByteNumberDef, Field, FieldDefinition, GroupDefinition,
-        NumberFormat, TextNumberDef,
+        AsciiStringDef, ByteNumberDef, BytesDef, Field, FieldDefinition,
+        GroupDefinition, NumberFormat, TextNumberDef,
     },
 };
 use crate::{
@@ -20,9 +20,23 @@ pub(crate) mod structure;
 
 #[derive(Debug, Default)]
 pub struct ProgramEnv {
-    pub groups: HashMap<String, GroupDefinition>,
-    pub gen: Option<GenDefinition>,
+    /// Map group name to its definition
+    ///
+    groups: HashMap<String, GroupDefinition>,
+
+    /// Generator definition
+    ///
+    gen: Option<GenDefinition>,
+
+    /// Name of an active group
+    ///
+    /// All field definitions will affect this group.
     cur_group: Option<String>,
+
+    /// Name of an active field
+    ///
+    /// All attribute updates will affect this field (from an active group).
+    ///
     cur_field: Option<String>,
 }
 
@@ -31,6 +45,7 @@ pub enum Evaluator {
     Started(ProgramEnv),
     DefiningFields(ProgramEnv),
     DefiningFieldAttr(ProgramEnv),
+    UpdatingFieldAttrs(ProgramEnv),
     DefiningGenerator(ProgramEnv),
     Finished(ProgramEnv),
 }
@@ -64,6 +79,9 @@ impl Evaluator {
             }
             Evaluator::DefiningFieldAttr(ctx) => {
                 state_defining_field_attr(ctx, statement)
+            }
+            Evaluator::UpdatingFieldAttrs(ctx) => {
+                state_updating_field_attrs(ctx, statement)
             }
             Evaluator::DefiningGenerator(ctx) => {
                 state_defining_generator(ctx, statement)
@@ -115,6 +133,7 @@ fn state_defining_fields(
             start_generator_definition(&mut ctx, name)?;
             Ok(Evaluator::DefiningGenerator(ctx))
         }
+        Statement::StartFieldsSection => Ok(Evaluator::UpdatingFieldAttrs(ctx)),
         x => unimplemented!("state_defining_fields: {:?}", x),
     }
 }
@@ -141,6 +160,31 @@ fn state_defining_field_attr(
             Ok(Evaluator::DefiningGenerator(ctx))
         }
         x => unimplemented!("state_defining_field_attr: {:?}", x),
+    }
+}
+
+fn state_updating_field_attrs(
+    mut ctx: ProgramEnv,
+    statement: Statement,
+) -> Result<Evaluator, BajzelError> {
+    match statement {
+        Statement::MakeCurrentField(name) => {
+            make_current_field(&mut ctx, name);
+            Ok(Evaluator::UpdatingFieldAttrs(ctx))
+        }
+        Statement::UpdateField(ident, expr) => {
+            update_current_field(&mut ctx, ident, expr)?;
+            Ok(Evaluator::UpdatingFieldAttrs(ctx))
+        }
+        Statement::StartGroupDefinition(name) => {
+            start_group_definition(&mut ctx, name)?;
+            Ok(Evaluator::DefiningFields(ctx))
+        }
+        Statement::StartGeneratorDefinition(name) => {
+            start_generator_definition(&mut ctx, name)?;
+            Ok(Evaluator::DefiningGenerator(ctx))
+        }
+        x => unimplemented!("state_updating_field_attrs: {:?}", x),
     }
 }
 
@@ -210,13 +254,18 @@ fn define_var_field(
         }
     } else if kind == "string" {
         field_def.replace(FieldDefinition::AsciiString(AsciiStringDef::new()));
+    } else if kind == "bytes" {
+        field_def.replace(FieldDefinition::Bytes(BytesDef::new()));
     } else if kind.starts_with('i') || kind.starts_with('u') {
         if let Ok(def) = TextNumberDef::from_str(kind.as_str()) {
             field_def.replace(FieldDefinition::TextNumber(def));
         }
     }
     let field_def = field_def.ok_or_else(|| {
-        BajzelError::Syntax(String::from("Unsupported variable field type"))
+        BajzelError::Syntax(format!(
+            "Unsupported variable field type ({})",
+            kind
+        ))
     })?;
     ctx.create_field(field_def, alias);
     Ok(())
@@ -244,21 +293,29 @@ fn update_generator_param(
     Ok(())
 }
 
-pub(crate) fn syntax_err<T>(msg: &str) -> Result<T, BajzelError> {
-    Err(BajzelError::Syntax(msg.to_owned()))
+pub(crate) fn syntax_err<T, S>(msg: S) -> Result<T, BajzelError>
+where
+    S: AsRef<str>,
+{
+    Err(BajzelError::Syntax(msg.as_ref().to_owned()))
 }
 
 impl ProgramEnv {
+    /// Create a new group definition and make it as a current one
     ///
-    ///
-    fn create_group(&mut self, name: Ident) {
+    pub fn create_group(&mut self, name: Ident) {
         self.groups
             .insert(name.to_string(), GroupDefinition::default());
         self.cur_group = Some(name.to_string());
         self.cur_field = None;
     }
 
-    fn create_generator(&mut self, name: Ident) -> Result<(), BajzelError> {
+    /// Create a generator definition
+    ///
+    /// Note: Only a single GENERATE section is allowed so more than single call
+    /// will make it return syntax error.
+    ///
+    pub fn create_generator(&mut self, name: Ident) -> Result<(), BajzelError> {
         if self.gen.is_some() {
             syntax_err("single GENERATE section allowed")
         } else {
@@ -267,7 +324,11 @@ impl ProgramEnv {
         }
     }
 
-    fn create_field(&mut self, def: FieldDefinition, alias: Option<Ident>) {
+    /// Create a new field definition for a current group
+    ///
+    /// Note: Might panic if called when no group is created.
+    ///
+    pub fn create_field(&mut self, def: FieldDefinition, alias: Option<Ident>) {
         let cur_group = self
             .cur_group
             .as_ref()
@@ -280,14 +341,23 @@ impl ProgramEnv {
             .groups
             .get_mut(cur_group)
             .expect("current group assigned only when group def of the same key is added");
-        group_def.fields.push(field);
+        group_def.add_field(field);
     }
 
-    fn use_field(&mut self, name: Ident) {
+    /// Set field of a given name as active one
+    ///
+    /// It makes all further attribute updates to affect this field.
+    ///
+    pub fn use_field(&mut self, name: Ident) {
         self.cur_field = Some(name.to_string());
     }
 
-    fn update_field(
+    /// Update attribute of a given name with value from a given expression of a field
+    /// that was made a current one.
+    ///
+    /// TODO: Make the function not to panic when no field was made active.
+    ///
+    pub fn update_field(
         &mut self,
         attr: Ident,
         expr: Expr,
@@ -302,27 +372,32 @@ impl ProgramEnv {
             FieldDefinition::TextNumber(def) => def.update(attr, expr),
             FieldDefinition::AsciiString(def) => def.update(attr, expr),
             FieldDefinition::ByteNumber(def) => def.update(attr, expr),
+            FieldDefinition::Bytes(def) => def.update(attr, expr),
         }
     }
 
-    fn get_field(&mut self) -> &mut Field {
+    /// Return an active field of a current group
+    ///
+    /// TODO: Make the function not to panic when no field was made active.
+    ///
+    pub fn get_field(&mut self) -> &mut Field {
         let cur_group =
             self.cur_group.as_ref().expect("current group must be set");
         let cur_field = self.cur_field.as_ref().expect("current field is set");
         let field = self
             .groups
             .get_mut(cur_group)
-            .and_then(|x| {
-                x.fields
-                    .iter_mut()
-                    .find(|x| x.alias.as_ref() == Some(cur_field))
-            })
+            .and_then(|group_def| group_def.find_field_mut(cur_field))
             .expect("Current group and current field must be set properly");
 
         field
     }
 
-    fn update_param(
+    /// Update parameter of a generator
+    ///
+    /// Returns an error if parameter of a given name does not exists
+    ///
+    pub fn update_param(
         &mut self,
         param: Ident,
         expr: Expr,
@@ -331,21 +406,52 @@ impl ProgramEnv {
         let expr = eval_expr(expr)?;
         let param = param.as_str();
 
-        match param {
+        match param.to_ascii_uppercase().as_str() {
             "OUT_MIN" => def.set_min_output_len(expr),
             "OUT_MAX" => def.set_max_output_len(expr),
             "TERM" => def.set_term(expr),
             _ => syntax_err("unsupported generator parameter"),
         }
     }
+
+    ///
+    pub fn get_group<T>(
+        &self,
+        name: &T,
+    ) -> Result<&GroupDefinition, BajzelError>
+    where
+        T: AsRef<str>,
+    {
+        self.groups
+            .get(name.as_ref())
+            .ok_or(BajzelError::NotConstructedProperly)
+    }
+
+    pub fn get_generator(&self) -> Result<&GenDefinition, BajzelError> {
+        self.gen.as_ref().ok_or(BajzelError::NotConstructedProperly)
+    }
 }
 
+/// Evaluate expression to a resolved form
+///
 fn eval_expr(expr: Expr) -> Result<Expr, BajzelError> {
     // Nothing to do for a now
     Ok(expr)
 }
 
-pub(crate) fn eval_expr_to_i64(expr: &Expr) -> Result<i64, BajzelError> {
+/// Extract i64 from the expression, if possible.
+///
+/// Examples:
+///
+/// ```rust
+/// use bajzel_lib::parser::{Expr, Literal};
+/// use bajzel_lib::evaluator::eval_expr_to_i64;
+///
+/// assert_eq!(eval_expr_to_i64(&Expr::Empty), Ok(0i64));
+/// let x = Expr::LiteralExpr(Literal::IntegerLiteral(42));
+/// assert_eq!(eval_expr_to_i64(&x), Ok(42i64));
+/// ```
+pub fn eval_expr_to_i64(expr: &Expr) -> Result<i64, BajzelError> {
     match expr {
         Expr::LiteralExpr(literal) => match literal {
             Literal::IntegerLiteral(value) => Ok(*value),
@@ -356,5 +462,6 @@ pub(crate) fn eval_expr_to_i64(expr: &Expr) -> Result<i64, BajzelError> {
         Expr::Group(_group) => Err(BajzelError::Expr(
             "eval_expr_to_i64: group expr not expected".to_owned(),
         )),
+        Expr::Empty => Ok(0),
     }
 }

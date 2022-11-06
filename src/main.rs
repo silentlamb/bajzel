@@ -1,9 +1,11 @@
 use bajzel_lib::{
     evaluator::evaluate_program,
+    generator::Gen,
     lexer::{lex_tokens, Tokens},
     parser::parse_tokens,
 };
 use clap::{arg, Command};
+use std::io::Write;
 
 fn run() -> Result<(), String> {
     let cmd = Command::new("bajzel").arg(arg!(<input> ".fuzl input file"));
@@ -16,6 +18,15 @@ fn run() -> Result<(), String> {
         .map_err(|_e| "Could not read file".to_string())?;
     let tokens =
         lex_tokens(input.as_str()).map_err(|_| String::from("Lexer failed"))?;
+
+    // println!("Input: ");
+    // println!("{}\n", input);
+
+    // println!("Tokens: ");
+    // for token in tokens.iter() {
+    //     println!("- {:?}", token);
+    // }
+
     let tokens = Tokens::new(&tokens);
     let program = parse_tokens(tokens)?;
 
@@ -36,23 +47,33 @@ fn run() -> Result<(), String> {
         bajzel_lib::error::BajzelError::Expr(x) => {
             format!("expression error: {}", x)
         }
+        bajzel_lib::error::BajzelError::NotConstructedProperly => {
+            panic!("program was not constructed properly!");
+        }
     })?;
 
-    println!("Evaluated program:\n");
-    for (name, group) in env.groups {
-        println!(">>> Group: {}", name);
-        println!("    Fields:");
-        for field in group.fields {
-            println!("        - {:?}: {:?}", field.alias, field.def);
-        }
-        println!();
-    }
+    // println!("Evaluated program:\n");
+    // for (name, group) in &env.groups {
+    //     println!(">>> Group: {}", name);
+    //     println!("    Fields:");
+    //     for field in &group.fields {
+    //         println!("        - {:?}: {:?}", field.alias, field.def);
+    //     }
+    //     println!();
+    // }
 
-    let gen = env.gen.expect("Generator should be defined");
-    println!(">>> Generator: {}", gen.name);
-    println!("    OUT  = {} to {}", gen.out_min, gen.out_max);
-    println!("    TERM = {:?}", gen.term);
+    // {
+    //     let gen = env.gen.as_ref().expect("Generator should be defined");
+    //     println!(">>> Generator: {}", gen.name);
+    //     println!("    OUT  = {} to {}", gen.out_min, gen.out_max);
+    //     println!("    TERM = {:?}", gen.term);
+    // }
 
+    let gen = Gen::default();
+    let output = gen
+        .generate(&env)
+        .map_err(|_| "Generate error".to_owned())?;
+    let _ = std::io::stdout().write_all(&output);
     Ok(())
 }
 

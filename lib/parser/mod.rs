@@ -10,18 +10,18 @@ pub fn parse_tokens(tokens: Tokens) -> Result<Program, String> {
         .map(|(_tokens, program)| program)
         .map_err(|e| match e {
             nom::Err::Incomplete(e) => {
-                format!("[-] Incomplete: {:?}", e)
+                format!("Incomplete: {:?}", e)
             }
             nom::Err::Error(e) => {
                 format!(
-                    "[-] Error ({:?}) at token: {:?}, next: {:?}",
+                    "Error ({:?}) at token: {:?}, next: {:?}",
                     e.code,
                     e.input.tokens[0],
                     &e.input.tokens[1..]
                 )
             }
             nom::Err::Failure(e) => {
-                format!("[!] Failure: {:?}", e)
+                format!("Failure: {:?}", e)
             }
         })
 }
@@ -167,6 +167,8 @@ pub enum Statement {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
+    Empty,
+
     /// Single literal (string, integer, etc)
     ///
     /// Examples:
